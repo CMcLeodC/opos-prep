@@ -41,7 +41,7 @@ export default function TimerBar({
             <button
               type="button"
               onClick={onStartExam}
-              className="text-primary underline"
+              className="text-primary underline cursor-pointer"
               disabled={isSubmitLocked}
             >
               Start Exam

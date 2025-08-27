@@ -32,6 +32,8 @@ export default function Writing() {
   const [attempt, setAttempt] = useState(1);
   const [isSubmitted, setSubmitted] = useState(false);
   const [fontScale, setFontScale] = useState(0); // 0=base,1=lg,2=xl
+  const [toast, setToast] = useState(null);
+
 
   // Timer
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -229,10 +231,11 @@ export default function Writing() {
     if (error) console.error("autosave failed:", error);
   }
 
-  async function submitAttemptRPC(text) {
-    if (!submissionId) return;
-    const { error } = await supabase.rpc("submit_attempt", { p_submission_id: submissionId, p_content_text: text });
-    if (error) console.error("submit_attempt failed:", error);
+  async function submitAttemptRPC(submissionId, text) {
+    const { data, error } = await supabase
+      .rpc("submit_attempt", { p_submission_id: submissionId, p_content_text: text });
+    if (error) { console.error(error); return null; }
+    return data;
   }
 
   async function loadFeedback() {
@@ -251,6 +254,12 @@ export default function Writing() {
     setFbLoading(false);
   }
 
+  async function ensureAttemptId() {
+    if (submissionId) return submissionId;
+    const id = await startAttemptRPC(mode === "exam" ? "exam" : "practice");
+    // startAttemptRPC already calls setSubmissionId(id); we also return it
+    return id;
+  }
 
   // -------- Handlers --------
   async function onChangeText(e) {
@@ -286,16 +295,19 @@ export default function Writing() {
   }
 
   async function handleSubmit() {
-    if (!submissionId) {
-      const id = await startAttemptRPC(mode === "exam" ? "exam" : "practice");
-      if (!id) return;
-    }
+    const id = await ensureAttemptId();           // <-- guaranteed id here
+    if (!id) return;
+
     if (mode === "exam") stopExamTimer();
-    await submitAttemptRPC(content);
+
+    await submitAttemptRPC(id, content);          // <-- pass id explicitly
+    setSubmissionId(id);                          // keep state in sync
     setSubmitted(true);
+
     try { localStorage.removeItem(draftKey); } catch { }
-    // kick a refresh so the panel shows "submitted (pending review)"
-    loadLatestStatusAndFeedback();
+
+    loadLatestStatusAndFeedback();                // shows “pending review” immediately
+    setToast("Submitted. We’ll email you when feedback is returned.");
   }
 
 
@@ -448,12 +460,24 @@ export default function Writing() {
         </div>
       )}
 
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border bg-background shadow-lg p-3">
+          <div className="text-sm">{toast}</div>
+          <div className="mt-2 text-right">
+            <button className="text-xs underline text-muted-foreground cursor-pointer" onClick={() => setToast(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+
       {/* Actions */}
       <div className="flex gap-3">
         <button
           type="button"
           onClick={handleSubmit}
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50 cursor-pointer"
           disabled={isSubmitted || (mode === "exam" && !isRunning)}
         >
           Submit
@@ -461,7 +485,7 @@ export default function Writing() {
         <button
           type="button"
           onClick={newAttempt}
-          className="inline-flex items-center rounded-md border px-4 py-2"
+          className="inline-flex items-center rounded-md border px-4 py-2 cursor-pointer"
           disabled={isRunning}
         >
           New Attempt

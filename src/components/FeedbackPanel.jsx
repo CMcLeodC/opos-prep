@@ -26,7 +26,7 @@ export default function FeedbackPanel({ status, feedback, loading, error, onRefr
           <button
             type="button"
             onClick={onRefresh}
-            className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
+            className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer"
             disabled={loading}
           >
             {loading ? "Checking…" : "Refresh"}

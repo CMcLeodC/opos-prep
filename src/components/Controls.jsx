@@ -52,7 +52,7 @@ export default function Controls({
         <div className="inline-flex rounded-md border overflow-hidden">
           <button
             type="button"
-            className="px-3 py-2 disabled:opacity-50"
+            className="px-3 py-2 disabled:opacity-50 cursor-pointer"
             onClick={() => onFontScale(Math.max(0, fontScale - 1))}
             disabled={fontScale === 0}
           >
@@ -63,7 +63,7 @@ export default function Controls({
           </div>
           <button
             type="button"
-            className="px-3 py-2 disabled:opacity-50"
+            className="px-3 py-2 disabled:opacity-50 cursor-pointer"
             onClick={() => onFontScale(Math.min(2, fontScale + 1))}
             disabled={fontScale === 2}
           >
