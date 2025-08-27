@@ -28,6 +28,9 @@ export default function Header() {
           <Link to="/writing" className="hover:underline">
             Writing
           </Link>
+          <Link to="/my-submissions" className="hover:underline">
+            My Submissions
+          </Link>
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="ml-2 p-2 rounded text-sm border border-gray-400 dark:border-gray-300"

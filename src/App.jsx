@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Listening from './pages/Listening'
 import Writing from './pages/Writing'
 import AdminReview from './pages/AdminReview'
+import MySubmissions from './pages/MySubmissions'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/listening" element={<Listening />} />
           <Route path="/writing" element={<Writing />} />
           <Route path="/admin/review" element={<AdminReview />} />
+          <Route path="/my-submissions" element={<MySubmissions />} />
         </Route>
       </Routes>
     </Router>

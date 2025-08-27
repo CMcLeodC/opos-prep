@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "../lib/supabaseClient";
+import PromptPanel from "../components/PromptPanel";
+import FeedbackPanel from "../components/FeedbackPanel";
+import Controls from "../components/Controls";
+import TimerBar from "../components/TimerBar";
+import SubmissionSummary from "../components/SubmissionSummary";
+
 
 // Fallbacks if the prompt/version don't specify values
 const TASKS = {
@@ -39,7 +45,11 @@ export default function Writing() {
   const [activeVersion, setActiveVersion] = useState(null);
   const [sourceText, setSourceText] = useState(null);
   const [loadingPrompt, setLoadingPrompt] = useState(true);
+  const [latestStatus, setLatestStatus] = useState(null); // latest {status, attempt, submitted_at, ...} for this prompt
   const [latestFeedback, setLatestFeedback] = useState(null);
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbErr, setFbErr] = useState("");
+
 
   // Derived
   const wordCount = useMemo(() => countWords(content), [content]);
@@ -169,6 +179,17 @@ export default function Writing() {
   }, [isRunning, mode]);
 
   useEffect(() => {
+    if (isSubmitted && submissionId) {
+      loadFeedback();
+    }
+  }, [isSubmitted, submissionId]);
+
+  useEffect(() => {
+    loadLatestStatusAndFeedback();
+  }, [prompt?.id]); // or [] if PROMPT_ID is fixed
+
+
+  useEffect(() => {
     if (!submissionId) return;
     (async () => {
       const { data, error } = await supabase
@@ -214,6 +235,23 @@ export default function Writing() {
     if (error) console.error("submit_attempt failed:", error);
   }
 
+  async function loadFeedback() {
+    if (!submissionId) return;
+    setFbLoading(true);
+    setFbErr("");
+    const { data, error } = await supabase
+      .from("feedback")
+      .select("id, rubric, overall_score, length_penalty_applied, comments_overall_md, created_at")
+      .eq("submission_id", submissionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) setFbErr(error.message || "Failed to load feedback");
+    setLatestFeedback(data || null);
+    setFbLoading(false);
+  }
+
+
   // -------- Handlers --------
   async function onChangeText(e) {
     const val = e.target.value;
@@ -248,7 +286,6 @@ export default function Writing() {
   }
 
   async function handleSubmit() {
-    // If no submission yet (e.g., user typed zero chars or straight submit in practice), create it now
     if (!submissionId) {
       const id = await startAttemptRPC(mode === "exam" ? "exam" : "practice");
       if (!id) return;
@@ -257,14 +294,74 @@ export default function Writing() {
     await submitAttemptRPC(content);
     setSubmitted(true);
     try { localStorage.removeItem(draftKey); } catch { }
+    // kick a refresh so the panel shows "submitted (pending review)"
+    loadLatestStatusAndFeedback();
   }
+
 
   function newAttempt() {
     setAttempt((a) => a + 1);
     setContent("");
     setSubmitted(false);
     setRunning(false);
+    setSecondsLeft(effectiveExamSeconds);
+    setSubmissionId(null);
+    // don't clear latestStatus/Feedback; those show your last returned result for this prompt
   }
+
+
+  async function loadLatestStatusAndFeedback() {
+    // ensure session so RLS allows reads
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      await supabase.auth.signInAnonymously(); // if you allow anon students
+    }
+
+    setFbLoading(true);
+    setFbErr("");
+    let status = null;
+    let feedback = null;
+
+    // Prefer latest returned
+    const { data: ret, error: e1 } = await supabase
+      .from("submissions")
+      .select("id,status,attempt_number,submitted_at,word_count,length_violation,length_delta")
+      .eq("prompt_id", PROMPT_ID)
+      .eq("status", "returned")
+      .order("submitted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (e1) setFbErr(e1.message || "Failed to load submissions");
+
+    if (ret) {
+      status = ret;
+      const { data: fb, error: e2 } = await supabase
+        .from("feedback")
+        .select("id,rubric,overall_score,length_penalty_applied,comments_overall_md,created_at")
+        .eq("submission_id", ret.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!e2) feedback = fb || null;
+    } else {
+      // Otherwise show latest submitted (pending)
+      const { data: subm } = await supabase
+        .from("submissions")
+        .select("id,status,attempt_number,submitted_at,word_count,length_violation,length_delta")
+        .eq("prompt_id", PROMPT_ID)
+        .eq("status", "submitted")
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (subm) status = subm;
+    }
+
+    setLatestStatus(status);
+    setLatestFeedback(feedback);
+    setFbLoading(false);
+  }
+
 
   const textSize = fontScale === 0 ? "text-base" : fontScale === 1 ? "text-lg" : "text-xl";
 
@@ -282,105 +379,37 @@ export default function Writing() {
         </p>
       </div>
 
-      {/* Prompt panel */}
-      {loadingPrompt ? (
-        <div className="mb-4 text-sm text-muted-foreground">Loading prompt…</div>
-      ) : prompt ? (
-        <div className="mb-4 rounded-md border p-3 bg-background">
-          <div className="font-semibold">{prompt.title}</div>
-          {activeVersion?.prompt_text_md && (
-            <p className="text-sm mt-1 whitespace-pre-wrap">{activeVersion.prompt_text_md}</p>
-          )}
-          {sourceText?.body_md && (
-            <div className="mt-3 rounded bg-muted p-2 text-sm whitespace-pre-wrap">
-              {sourceText.body_md}
-              {sourceText.attribution && (
-                <div className="mt-1 text-xs text-muted-foreground">— {sourceText.attribution}</div>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="mb-4 rounded-md border p-3 bg-yellow-50 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-          Couldn’t load the prompt. Double-check PROMPT_ID or RLS.
-        </div>
-      )}
+      <PromptPanel
+        loading={loadingPrompt}
+        prompt={prompt}
+        activeVersion={activeVersion}
+        sourceText={sourceText}
+      />
 
-      {/* Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <label className="flex flex-col">
-          <span className="text-sm font-medium mb-1">Task</span>
-          <select
-            className="rounded-md border bg-background px-3 py-2"
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            disabled={isSubmitted || isRunning}
-          >
-            {Object.values(TASKS).map((t) => (
-              <option key={t.key} value={t.key}>{t.label}</option>
-            ))}
-          </select>
-        </label>
+      <Controls
+        task={task}
+        onTaskChange={(v) => setTask(v)}
+        mode={mode}
+        onModeChange={(v) => setMode(v)}
+        fontScale={fontScale}
+        onFontScale={(v) => setFontScale(v)}
+        tasksMap={TASKS}
+        disabled={isSubmitted || isRunning}
+      />
 
-        <label className="flex flex-col">
-          <span className="text-sm font-medium mb-1">Mode</span>
-          <select
-            className="rounded-md border bg-background px-3 py-2"
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            disabled={isSubmitted || isRunning}
-          >
-            <option value="practice">Practice</option>
-            <option value="exam">Exam</option>
-          </select>
-        </label>
 
-        <div className="flex flex-col">
-          <span className="text-sm font-medium mb-1">Font size</span>
-          <div className="inline-flex rounded-md border overflow-hidden">
-            <button
-              type="button"
-              className="px-3 py-2 disabled:opacity-50"
-              onClick={() => setFontScale((f) => (f > 0 ? f - 1 : f))}
-              disabled={fontScale === 0}
-            >A-</button>
-            <div className="px-3 py-2 border-l border-r">
-              {fontScale === 0 ? "Base" : fontScale === 1 ? "Large" : "XL"}
-            </div>
-            <button
-              type="button"
-              className="px-3 py-2 disabled:opacity-50"
-              onClick={() => setFontScale((f) => (f < 2 ? f + 1 : f))}
-              disabled={fontScale === 2}
-            >A+</button>
-          </div>
-        </div>
-      </div>
+      <TimerBar
+        label={label}
+        // If you have effectiveMin/effectiveMax in your JS file, pass those instead:
+        minWords={effectiveMin}
+        maxWords={effectiveMax}
+        mode={mode}
+        isRunning={isRunning}
+        secondsLeft={secondsLeft}
+        onStartExam={startExam}
+        isSubmitLocked={isSubmitted}
+      />
 
-      {/* Task band + timer */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm">
-          <span className="font-medium">{label}</span>
-          <span className="mx-2">•</span>
-          <span>Target: {effectiveMin}–{effectiveMax} words</span>
-        </div>
-        {mode === "exam" ? (
-          <div className="text-sm font-mono">
-            {isRunning ? (
-              <span>⏳ {formatMMSS(secondsLeft)}</span>
-            ) : (
-              <button
-                type="button"
-                onClick={startExam}
-                className="text-primary underline"
-                disabled={isSubmitted}
-              >Start Exam</button>
-            )}
-          </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">Practice mode</div>
-        )}
-      </div>
 
       {/* Editor */}
       <div className="mb-4">
@@ -440,40 +469,13 @@ export default function Writing() {
         <div className="ml-auto text-sm text-muted-foreground">Attempt #{attempt}</div>
       </div>
 
-      {/* Post-submit summary */}
-      {isSubmitted && (
-        <motion.div
-          className="mt-6 rounded-md border p-4 bg-gray-50 dark:bg-gray-800"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <h3 className="font-semibold mb-2">Submission received</h3>
-          <ul className="text-sm space-y-1">
-            <li><strong>Task:</strong> {label}</li>
-            <li><strong>Mode:</strong> {mode}</li>
-            <li><strong>Words:</strong> {wordCount} {withinBand ? "✅ within target" : `⚠️ outside ${effectiveMin}–${effectiveMax}`}</li>
-            {mode === "exam" && (
-              <li className="text-muted-foreground">Scores/feedback will appear here later.</li>
-            )}
-          </ul>
-        </motion.div>
-      )}
-
-      {latestFeedback && (
-        <div className="mt-4 rounded-md border p-4 bg-background">
-          <h4 className="font-semibold mb-2">Feedback</h4>
-          <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1">
-            {Object.entries(latestFeedback.rubric || {}).map(([k, v]) => (
-              <div key={k}><span className="text-muted-foreground">{k}:</span> <span className="font-medium">{v}</span></div>
-            ))}
-            <div><span className="text-muted-foreground">Overall:</span> <span className="font-medium">{latestFeedback.overall_score?.toFixed(2)}</span></div>
-            {latestFeedback.length_penalty_applied && <div className="text-amber-600 col-span-2">Length penalty applied (−0.5 on Task Achievement)</div>}
-          </div>
-          {latestFeedback.comments_overall_md && (
-            <p className="text-sm whitespace-pre-wrap mt-3">{latestFeedback.comments_overall_md}</p>
-          )}
-        </div>
-      )}
+      <FeedbackPanel
+        status={latestStatus}
+        feedback={latestFeedback}
+        loading={fbLoading}
+        error={fbErr}
+        onRefresh={loadLatestStatusAndFeedback}
+      />
     </motion.div>
   );
 }
