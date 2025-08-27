@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 // Fallbacks if the prompt/version don't specify values
 const TASKS = {
   concept_definition: { key: "concept_definition", label: "Concept definition", min: 100, max: 125, examSeconds: 15 * 60 },
-  activity_design:    { key: "activity_design",    label: "Activity design",    min: 150, max: 175, examSeconds: 25 * 60 },
+  activity_design: { key: "activity_design", label: "Activity design", min: 150, max: 175, examSeconds: 25 * 60 },
 };
 
 const PROMPT_ID = "6b782801-037a-4eae-9b79-030a87e1fe4d"; // <-- put your prompt id here
@@ -39,6 +39,7 @@ export default function Writing() {
   const [activeVersion, setActiveVersion] = useState(null);
   const [sourceText, setSourceText] = useState(null);
   const [loadingPrompt, setLoadingPrompt] = useState(true);
+  const [latestFeedback, setLatestFeedback] = useState(null);
 
   // Derived
   const wordCount = useMemo(() => countWords(content), [content]);
@@ -167,10 +168,24 @@ export default function Writing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, mode]);
 
+  useEffect(() => {
+    if (!submissionId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("feedback")
+        .select("id, rubric, overall_score, length_penalty_applied, comments_overall_md, created_at")
+        .eq("submission_id", submissionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!error) setLatestFeedback(data || null);
+    })();
+  }, [submissionId, isSubmitted]);
+
   // -------- Debounced autosave (local + DB) --------
   useDebouncedEffect(() => {
     if (!isSubmitted) {
-      try { localStorage.setItem(draftKey, content); } catch {}
+      try { localStorage.setItem(draftKey, content); } catch { }
       autosaveDraftToDB(content);
     }
   }, [content, draftKey, isSubmitted], 5000);
@@ -241,7 +256,7 @@ export default function Writing() {
     if (mode === "exam") stopExamTimer();
     await submitAttemptRPC(content);
     setSubmitted(true);
-    try { localStorage.removeItem(draftKey); } catch {}
+    try { localStorage.removeItem(draftKey); } catch { }
   }
 
   function newAttempt() {
@@ -442,6 +457,22 @@ export default function Writing() {
             )}
           </ul>
         </motion.div>
+      )}
+
+      {latestFeedback && (
+        <div className="mt-4 rounded-md border p-4 bg-background">
+          <h4 className="font-semibold mb-2">Feedback</h4>
+          <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1">
+            {Object.entries(latestFeedback.rubric || {}).map(([k, v]) => (
+              <div key={k}><span className="text-muted-foreground">{k}:</span> <span className="font-medium">{v}</span></div>
+            ))}
+            <div><span className="text-muted-foreground">Overall:</span> <span className="font-medium">{latestFeedback.overall_score?.toFixed(2)}</span></div>
+            {latestFeedback.length_penalty_applied && <div className="text-amber-600 col-span-2">Length penalty applied (−0.5 on Task Achievement)</div>}
+          </div>
+          {latestFeedback.comments_overall_md && (
+            <p className="text-sm whitespace-pre-wrap mt-3">{latestFeedback.comments_overall_md}</p>
+          )}
+        </div>
       )}
     </motion.div>
   );
