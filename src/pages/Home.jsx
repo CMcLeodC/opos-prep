@@ -34,7 +34,7 @@ export default function Home() {
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <Link
-            to="/listening"
+            to="/listening-tests"
             className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition"
           >
             Try Listening Practice

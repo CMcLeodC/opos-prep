@@ -57,7 +57,7 @@ export default function Header() {
         </Link>
 
         <div className="flex items-center space-x-4">
-          <Link to="/listening" className="hover:underline">
+          <Link to="/listening-tests" className="hover:underline">
             Listening
           </Link>
           <Link to="/writing" className="hover:underline">
