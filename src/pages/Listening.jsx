@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useMemo, memo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ensureSession, callFunctionRaw } from "../lib/supaFetch";
+import { supabase } from "../lib/supabaseClient"; // For debug log
 import ListeningResultPanel from "../components/ListeningResultPanel";
+import OpenResponseFeedback from "../components/OpenResponseFeedback"; // Add this
 import { logEvent } from "../lib/analytics"; // add at top
 
 const ClozeParagraph = memo(({ template, clozeIndexToQid, answers, setAnswer }) => {
@@ -98,6 +100,15 @@ export default function Listening() {
     })();
   }, [mode, promptId]);
 
+  useEffect(() => {
+    logEvent("test_view", {
+      context: "test",
+      path: window.location.pathname,
+      prompt_id: promptId || "latest"
+    });
+  }, [promptId]);
+
+
   // audio handlers
   const onTimeUpdate = () => {
     const a = audioRef.current;
@@ -134,6 +145,7 @@ export default function Listening() {
 
   const onSubmit = async () => {
     if (!attempt?.id) return;
+    console.log("Submitting with user:", await supabase.auth.getUser());
     setSubmitting(true);
     try {
       const payload = {
@@ -144,6 +156,7 @@ export default function Listening() {
           response_text: v.response_text ?? null,
         })),
       };
+      console.log("Submission payload:", payload);
       const data = await callFunctionRaw("submit_listening_attempt", payload);
       setResult(data);
       // compute simple breakdown & duration
@@ -216,11 +229,10 @@ export default function Listening() {
   // A tiny helper to build a simple category breakdown from section scores TO BE EDITED LATER
   function buildBreakdown({ result, counts }) {
     const { mcqScore = 0, clozeScore = 0, openScore = 0 } = result || {};
-    // Map sections → categories (simple & deterministic)
     return {
-      Detalle: mcqScore,        // MCQ ≈ detalle/distractores
-      Ortografía: clozeScore,   // Cloze ≈ ortografía
-      Vocabulario: openScore,   // Open ≈ vocabulario
+      Detalle: mcqScore,
+      Ortografía: clozeScore,
+      Vocabulario: openScore / 2 // Normalize to match MCQ/CLOZE scale (assuming 2 points max per OPEN)
     };
   }
 
@@ -450,6 +462,7 @@ export default function Listening() {
             total={(mcqs.length + cloze.length + opens.length) || 3}
             testTitle={versionMeta?.title || "Readiness Check"}
           />
+          <OpenResponseFeedback attemptId={attempt.id} />
         </div>
       )}
     </div>

@@ -10,6 +10,8 @@ import Profile from './pages/Profile'
 import ListeningTests from './pages/ListeningTests'
 import AdminListeningReview from './pages/AdminListeningReview'
 import AdminListeningResults from './pages/AdminListeningResults'
+import AdminListeningCreate from './pages/AdminListeningCreate'
+import AdminListeningTests from './pages/AdminListeningTests'
 import OpoMentorLanding from './pages/Landing'
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
           <Route path="/admin/writing-review" element={<AdminReview />} />
           <Route path="/admin/listening-review" element={<AdminListeningReview />} />
           <Route path="/admin/listening-results" element={<AdminListeningResults />} />
+          <Route path="/admin/listening-create" element={<AdminListeningCreate />} />
+          <Route path="/admin/listening-tests" element={<AdminListeningTests />} />
           <Route path="/my-submissions" element={<MySubmissions />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<Profile />} />
