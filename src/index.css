@@ -8,6 +8,17 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .md\:grid-template-columns-custom {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .md\:grid-template-columns-custom > *:first-child {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+}
+
 @layer utilities {
   .animate-fadeIn {
     @apply opacity-0 translate-y-4 transition-all duration-700 ease-out;

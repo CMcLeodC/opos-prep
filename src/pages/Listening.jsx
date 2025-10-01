@@ -252,190 +252,237 @@ export default function Listening() {
   const labelForCloze = (hasA && hasB ? "C" : (hasA || hasB) ? "B" : "A");
 
   return (
-    <div className="max-w-6xl mx-auto mt-6 px-4">
+    <div className={`max-w-6xl mx-auto mt-6 px-4 ${mode === "exam" ? "bg-red-50/30 dark:bg-red-900/10" : ""}`}>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Listening Practice</h2>
+        <h2 className="text-2xl font-bold">
+          {mode === "exam" ? (
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+              Exam Mode
+            </span>
+          ) : (
+            "Listening Practice"
+          )}
+        </h2>
         <div className="flex items-center gap-3 text-sm">
           <span className="hidden sm:inline text-gray-500 dark:text-gray-400">
             Best on a laptop/desktop — mobiles are not ideal for this task.
           </span>
           <label className="flex items-center gap-2">
-            <input type="radio" name="mode" value="practice" checked={mode === "practice"} onChange={() => setMode("practice")} />
-            Practice
+            <input 
+              type="radio" 
+              name="mode" 
+              value="practice" 
+              checked={mode === "practice"} 
+              onChange={() => setMode("practice")} 
+            />
+            <span className="text-green-700 dark:text-green-400 font-medium">Practice</span>
           </label>
           <label className="flex items-center gap-2">
-            <input type="radio" name="mode" value="exam" checked={mode === "exam"} onChange={() => setMode("exam")} />
-            Exam
+            <input 
+              type="radio" 
+              name="mode" 
+              value="exam" 
+              checked={mode === "exam"} 
+              onChange={() => setMode("exam")} 
+            />
+            <span className="text-red-700 dark:text-red-400 font-medium">Exam</span>
           </label>
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-500/20 p-3 rounded mb-4 text-sm">
-        <p className="font-medium">Instructions</p>
-        <ul className="list-disc ml-5">
-          <li>You will hear the audio <strong>twice</strong>.</li>
-          <li>
-            Answer {[
-              hasA && "Multiple Choice",
-              hasB && "Short Answers",
-              hasC && "Cloze"
-            ].filter(Boolean).join(", ")} at the same time (all visible).
-          </li>
-          <li>{mode === "practice" ? "Results show after submit." : "Results will be released after review."}</li>
-        </ul>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <div className="p-4 rounded border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={togglePlay}
-                disabled={!audioUrl || plays >= 2}
-                className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-              >
-                {playing ? "Pause" : plays >= 2 ? "Finished (2 plays)" : "Play"}
-              </button>
-              <div className="text-sm">Plays: {plays} / 2</div>
-            </div>
-            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded mt-3">
-              <div className="h-2 bg-blue-600 rounded" style={{ width: `${Math.floor(progress * 100)}%` }} />
-            </div>
-            <audio
-              ref={audioRef}
-              src={audioUrl ?? undefined}
-              onTimeUpdate={onTimeUpdate}
-              onEnded={onEnded}
-              preload="auto"
-            />
-            {mode === "practice" && (
-              <div className="mt-3">
-                <button
-                  onClick={revealTranscript}
-                  disabled={plays < 2}
-                  className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-sm"
-                >
-                  {plays < 2 ? "Transcript available after 2 plays" : "Show transcript"}
-                </button>
-                {transcript && (
-                  <div
-                    className="prose dark:prose-invert mt-3 max-w-none"
-                    dangerouslySetInnerHTML={{ __html: transcript }}
-                  />
-                )}
-              </div>
+      {/* Instructions and Audio Player in the same section */}
+      <div className="grid gap-6 lg:grid-cols-2 mb-6">
+        {/* Instructions Panel */}
+        <div className={`p-3 rounded text-sm ${
+          mode === "exam" 
+            ? "bg-red-100 dark:bg-red-500/20 border-l-4 border-red-500" 
+            : "bg-blue-50 dark:bg-blue-500/20"
+        }`}>
+          <p className="font-medium">{mode === "exam" ? "Exam Instructions" : "Practice Instructions"}</p>
+          <ul className="list-disc ml-5">
+            <li>You will hear the audio <strong>twice</strong>.</li>
+            <li>
+              Answer {[
+                hasA && "Multiple Choice",
+                hasB && "Short Answers",
+                hasC && "Cloze"
+              ].filter(Boolean).join(", ")} at the same time (all visible).
+            </li>
+            <li>{mode === "practice" ? "Results show after submit." : "Results will be released after review."}</li>
+            {mode === "exam" && (
+              <li className="text-red-700 dark:text-red-300 font-medium">This is a formal examination - no transcript available</li>
             )}
-          </div>
-
-          {hasA && (
-            <section className="p-4 rounded border border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold mb-3">Multiple Choice ({mcqs.length})</h3>
-              <div className="space-y-4">
-                {mcqs.map((q, i) => {
-                  const opts = q.meta?.options || [];
-                  return (
-                    <div key={q.id}>
-                      <p className="font-medium mb-2">
-                        {i + 1}. <span dangerouslySetInnerHTML={{ __html: q.stem_md }} />
-                      </p>
-                      <div className="grid sm:grid-cols-2 gap-2">
-                        {opts.map((opt, idx) => {
-                          const letter = String.fromCharCode(65 + idx);
-                          return (
-                            <label key={idx} className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                              <input
-                                type="radio"
-                                name={q.id}
-                                checked={answers[q.id]?.selected_option === letter}
-                                onChange={() => setAnswer(q.id, { selected_option: letter })}
-                              />
-                              <span>{letter}) {opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+          </ul>
         </div>
 
-        <div className="space-y-6">
-          {hasB && (
-            <section className="p-4 rounded border border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold mb-3">
-                Short Answers ({opens.length})
-              </h3>
-              <div className="space-y-4">
-                {opens.map((q, i) => (
+        {/* Audio Player Panel */}
+        <div className="p-4 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={togglePlay}
+              disabled={!audioUrl || plays >= 2}
+              className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+            >
+              {playing ? "Pause" : plays >= 2 ? "Finished (2 plays)" : "Play"}
+            </button>
+            <div className="text-sm">Plays: {plays} / 2</div>
+          </div>
+          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded mt-3">
+            <div className="h-2 bg-blue-600 rounded" style={{ width: `${Math.floor(progress * 100)}%` }} />
+          </div>
+          <audio
+            ref={audioRef}
+            src={audioUrl ?? undefined}
+            onTimeUpdate={onTimeUpdate}
+            onEnded={onEnded}
+            preload="auto"
+          />
+          {mode === "practice" && (
+            <div className="mt-3">
+              <button
+                onClick={revealTranscript}
+                disabled={plays < 2}
+                className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 disabled:opacity-50 text-sm"
+              >
+                {plays < 2 ? "Transcript available after 2 plays" : "Show transcript"}
+              </button>
+              {transcript && (
+                <div
+                  className="prose dark:prose-invert mt-3 max-w-none"
+                  dangerouslySetInnerHTML={{ __html: transcript }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Questions Grid - Using auto-flow dense for better space utilization */}
+      <div className={`grid gap-6 ${
+        (hasA && hasB && hasC) 
+          ? 'md:grid-template-columns-custom xl:grid-cols-3' 
+          : (hasA || hasB || hasC) 
+            ? 'lg:grid-cols-2' 
+            : ''
+      }`}>
+        {/* Multiple Choice Section - Typically longer */}
+        {hasA && (
+          <section className="p-4 rounded border border-gray-200 dark:border-gray-700 h-fit md:row-span-2">
+            <h3 className="text-lg font-semibold mb-3">Multiple Choice ({mcqs.length})</h3>
+            <div className="space-y-4">
+              {mcqs.map((q, i) => {
+                const opts = q.meta?.options || [];
+                return (
                   <div key={q.id}>
                     <p className="font-medium mb-2">
                       {i + 1}. <span dangerouslySetInnerHTML={{ __html: q.stem_md }} />
                     </p>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
-                      value={answers[q.id]?.response_text || ""}
-                      onChange={(e) => setAnswer(q.id, { response_text: e.target.value })}
-                      placeholder="Type your answer…"
-                    />
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {opts.map((opt, idx) => {
+                        const letter = String.fromCharCode(65 + idx);
+                        return (
+                          <label key={idx} className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={q.id}
+                              checked={answers[q.id]?.selected_option === letter}
+                              onChange={() => setAnswer(q.id, { selected_option: letter })}
+                            />
+                            <span>{letter}) {opt}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
+                );
+              })}
+            </div>
+          </section>
+        )}
 
-          {hasC && (
-            <section className="p-4 rounded border border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold mb-3">
-                Paragraph Cloze ({cloze.length}) — Section {labelForCloze}
-              </h3>
-
-              {clozeTemplate ? (
-                <div className="prose dark:prose-invert max-w-none">
-                  <ClozeParagraph
-                    template={clozeTemplate}
-                    clozeIndexToQid={clozeIndexToQid}
-                    answers={answers}
-                    setAnswer={setAnswer}
+        {/* Short Answers Section */}
+        {hasB && (
+          <section className="p-4 rounded border border-gray-200 dark:border-gray-700 h-fit">
+            <h3 className="text-lg font-semibold mb-3">
+              Short Answers ({opens.length})
+            </h3>
+            <div className="space-y-4">
+              {opens.map((q, i) => (
+                <div key={q.id}>
+                  <p className="font-medium mb-2">
+                    {i + 1}. <span dangerouslySetInnerHTML={{ __html: q.stem_md }} />
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                    value={answers[q.id]?.response_text || ""}
+                    onChange={(e) => setAnswer(q.id, { response_text: e.target.value })}
+                    placeholder="Type your answer…"
                   />
                 </div>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    (No paragraph template found—showing gaps as a list for this exercise.)
-                  </p>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {cloze.map((q) => (
-                      <div key={q.id} className="p-3 rounded border border-gray-200 dark:border-gray-700">
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                          Gap {q.meta?.gap_index}
-                        </p>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
-                          value={answers[q.id]?.response_text || ""}
-                          onChange={(e) => setAnswer(q.id, { response_text: e.target.value })}
-                          placeholder={`Gap ${q.meta?.gap_index}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              <p className="text-xs text-gray-500 mt-2">
-                Tip: Click each gap and type the exact word(s) you hear.
-              </p>
-            </section>
-          )}
-        </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Cloze Section */}
+        {hasC && (
+          <section className="p-4 rounded border border-gray-200 dark:border-gray-700 h-fit">
+            <h3 className="text-lg font-semibold mb-3">
+              Paragraph Cloze ({cloze.length}) — Section {labelForCloze}
+            </h3>
+
+            {clozeTemplate ? (
+              <div className="prose dark:prose-invert max-w-none">
+                <ClozeParagraph
+                  template={clozeTemplate}
+                  clozeIndexToQid={clozeIndexToQid}
+                  answers={answers}
+                  setAnswer={setAnswer}
+                />
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  (No paragraph template found—showing gaps as a list for this exercise.)
+                </p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {cloze.map((q) => (
+                    <div key={q.id} className="p-3 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                        Gap {q.meta?.gap_index}
+                      </p>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                        value={answers[q.id]?.response_text || ""}
+                        onChange={(e) => setAnswer(q.id, { response_text: e.target.value })}
+                        placeholder={`Gap ${q.meta?.gap_index}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              Tip: Click each gap and type the exact word(s) you hear.
+            </p>
+          </section>
+        )}
       </div>
 
       <div className="mt-8 flex items-center gap-4">
-        <button onClick={onSubmit} disabled={!attempt || submitting} className="px-5 py-2 rounded bg-green-600 text-white disabled:opacity-50">
-          {submitting ? "Submitting…" : "Submit answers"}
+        <button 
+          onClick={onSubmit} 
+          disabled={!attempt || submitting} 
+          className={`px-5 py-2 rounded text-white disabled:opacity-50 ${
+            mode === "exam" 
+              ? "bg-red-600 hover:bg-red-700" 
+              : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {submitting ? "Submitting…" : mode === "exam" ? "Submit Exam" : "Submit Practice"}
         </button>
         <span className="text-sm text-gray-600 dark:text-gray-300">
           {plays < 2 ? "Audio can be played up to 2 times." : "Audio finished (2 plays)."}
